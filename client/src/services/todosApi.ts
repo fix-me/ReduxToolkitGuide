@@ -36,6 +36,10 @@ export const todosApi = createApi({
 			query: id => ({ url: `/todos/${id}/flag`, method: "POST" }),
 			invalidatesTags: (r, e, id) => [{ type: "History", id }]
 		}),
+		unflagTodo: builder.mutation<void, string>({
+			query: id => ({ url: `/todos/${id}/flag`, method: "DELETE" }),
+			invalidatesTags: (r, e, id) => [{ type: "History", id }]
+		}),
 		deleteTodo: builder.mutation<void, string>({
 			query: id => ({ url: `/todos/${id}`, method: "DELETE" }),
 			invalidatesTags: (r, e, id) => [
@@ -56,6 +60,7 @@ export const {
 	useAddTagMutation,
 	useDeleteTodoMutation,
 	useFlagTodoMutation,
+	useUnflagTodoMutation,
 	useGetHistoryQuery,
 	useGetTodosQuery,
 	useToggleTodoMutation

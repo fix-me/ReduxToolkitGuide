@@ -1,51 +1,37 @@
-import { useState } from "react";
-import type React from "react";
-import {
-	useAddTagMutation,
-	useAddTodoMutation,
-	useDeleteTodoMutation,
-	useFlagTodoMutation,
-	useGetTodosQuery,
-	useToggleTodoMutation
-} from "../../services/todosApi";
-import { TodoHistoryPanel } from "./TodoHistoryPanel";
-import type { Todo } from "./types";
-import { useDispatch, useSelector } from "react-redux";
-import { selectSelectedTodoId, selectTodo } from "./uiSlice";
-import type { RootState } from "../../store";
 import {
 	Box,
 	Button,
-	Checkbox,
-	Chip,
 	Container,
 	Divider,
-	IconButton,
 	List,
-	ListItem,
-	ListItemIcon,
-	ListItemText,
 	Paper,
 	Stack,
 	TextField,
+	ToggleButton,
+	ToggleButtonGroup,
 	Typography
 } from "@mui/material";
-import HistoryIcon from "@mui/icons-material/History";
-import LabelIcon from "@mui/icons-material/Label";
-import FlagIcon from "@mui/icons-material/Flag";
-import DeleteIcon from "@mui/icons-material/Delete";
+import type React from "react";
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+	useAddTodoMutation,
+	useGetTodosQuery
+} from "../../services/todosApi";
+import type { RootState } from "../../store";
+import { TodoHistoryPanel } from "./TodoHistoryPanel";
+import { TodoRow } from "./TodoRow";
+import type { Todo } from "./types";
+import { selectFilter, selectSelectedTodoId, setFilter } from "./uiSlice";
 
 export function TodoApp() {
 	const { data: todos, isLoading, isError } = useGetTodosQuery();
 	const [addTodo] = useAddTodoMutation();
-	const [toggleTodo] = useToggleTodoMutation();
-	const [addTag] = useAddTagMutation();
-	const [deleteTodo] = useDeleteTodoMutation();
-	const [flagTodo] = useFlagTodoMutation();
 
 	const [title, setTitle] = useState("");
 	const dispatch = useDispatch();
 	const selectedTodoId = useSelector((s: RootState) => selectSelectedTodoId(s));
+	const filter = useSelector((s: RootState) => selectFilter(s));
 
 	if (isLoading) return <Container maxWidth="md"><Typography>loading…</Typography></Container>;
 	if (isError) return <Container maxWidth="md"><Typography color="error">error</Typography></Container>;
@@ -60,8 +46,8 @@ export function TodoApp() {
 
 	return (
 		<Container maxWidth="lg" sx={{ py: 3 }}>
-			<Stack direction="row" spacing={3} alignItems="flex-start">
-				<Box sx={{ flex: 1 }}>
+			<Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems="flex-start">
+				<Box sx={{ flex: { md: 1 }, width: { xs: "100%", md: "auto" } }}>
 					<Typography variant="h4" gutterBottom>
 						Todo demo (RTK Query + Express + in-memory)
 					</Typography>
@@ -83,66 +69,32 @@ export function TodoApp() {
 					</Box>
 
 					<Paper variant="outlined" sx={{ mt: 2 }}>
+						<Stack direction="row" alignItems="center" spacing={1} sx={{ p: 1.5, pb: 0 }}>
+							<ToggleButtonGroup
+								value={filter}
+								exclusive
+								onChange={(_e, val) => val && dispatch(setFilter(val))}
+								size="small"
+							>
+								<ToggleButton value="all">all ({todos?.length ?? 0})</ToggleButton>
+								<ToggleButton value="open">
+									open ({todos?.filter(t => !t.done).length ?? 0})
+								</ToggleButton>
+								<ToggleButton value="done">
+									done ({todos?.filter(t => t.done).length ?? 0})
+								</ToggleButton>
+							</ToggleButtonGroup>
+						</Stack>
 						<List dense>
-							{todos?.map((t: Todo) => (
-								<ListItem
-									key={t.id}
-									secondaryAction={
-										<Stack direction="row" spacing={0.5}>
-											<IconButton edge="end" aria-label="history" onClick={() => dispatch(selectTodo(t.id))}>
-												<HistoryIcon />
-											</IconButton>
-											<IconButton
-												edge="end"
-												aria-label="add tag"
-												onClick={() => {
-													const tag = window.prompt("tag?");
-													if (tag) addTag({ id: t.id, tag });
-												}}
-											>
-												<LabelIcon />
-											</IconButton>
-											<IconButton edge="end" aria-label="flag" onClick={() => flagTodo(t.id)}>
-												<FlagIcon />
-											</IconButton>
-											<IconButton
-												edge="end"
-												aria-label="delete"
-												onClick={() => {
-													if (window.confirm("delete todo?")) deleteTodo(t.id);
-													if (selectedTodoId === t.id) dispatch(selectTodo(null));
-												}}
-											>
-												<DeleteIcon />
-											</IconButton>
-										</Stack>
-									}
-								>
-									<ListItemIcon>
-										<Checkbox edge="start" checked={t.done} onChange={() => toggleTodo(t.id)} />
-									</ListItemIcon>
-									<ListItemText
-										primary={
-											<Typography sx={{ textDecoration: t.done ? "line-through" : "none" }}>
-												{t.title}
-											</Typography>
-										}
-										secondary={
-											t.tags?.length ? (
-												<Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
-													{t.tags.map(tag => (
-														<Chip key={tag} size="small" label={tag} />
-													))}
-												</Stack>
-											) : undefined
-										}
-									/>
-								</ListItem>
+							{todos
+								?.filter((t: Todo) => (filter === "open" ? !t.done : filter === "done" ? t.done : true))
+								.map((t: Todo) => (
+								<TodoRow key={t.id} t={t} />
 							))}
 						</List>
 					</Paper>
 				</Box>
-				<Box sx={{ width: 360 }}>
+				<Box sx={{ width: { xs: "100%", md: 360 }, mt: { xs: 2, md: 0 } }}>
 					<Typography variant="subtitle1" gutterBottom>
 						History
 					</Typography>

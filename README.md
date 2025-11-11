@@ -70,14 +70,15 @@ type Todo = { id: string; title: string; done: boolean; tags?: string[] };
 - POST `/todos/:id/toggle` → Todo
 - POST `/todos/:id/tag` body: `{ tag: string }` → Todo
 - POST `/todos/:id/flag` → `{ ok: true }`
+- DELETE `/todos/:id/flag` → 204
 - DELETE `/todos/:id` → 204
 - GET `/todos/:id/history` → `{ history, meta, flagged }`
 
 ### Client (Vite + React + RTK Query + MUI)
 - `createApi` service for CRUD and history:
-  - `getTodos`, `addTodo`, `toggleTodo`, `addTag`, `flagTodo`, `deleteTodo`, `getHistory`
+  - `getTodos`, `addTodo`, `toggleTodo`, `addTag`, `flagTodo`, `unflagTodo`, `deleteTodo`, `getHistory`
 - UI built with Material UI:
-  - `TodoApp` lists todos, supports add/toggle/tag/flag/delete and selects a todo for history
+  - `TodoApp` lists todos, supports add/toggle/tag/flag/unflag/delete; shows a responsive history pane
   - `TodoHistoryPanel` shows side-car history, flagged, and lastTouched
 
 #### Demo: createSlice with reducers and selectors

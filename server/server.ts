@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import { randomUUID } from "node:crypto";
 
-// ----- types -----
 type Todo = { id: string; title: string; done: boolean; tags?: string[] };
 type TodosState = { entities: Record<string, Todo>; order: string[] };
 
@@ -11,15 +10,34 @@ const initialState: TodosState = {
 	order: []
 };
 
-// prefill with tips
 const prefills: Array<Omit<Todo, "id">> = [
-	{ title: "Map: wenn Keys nicht strings sind.", done: false },
-	{ title: "WeakMap: seitliche Caches, nicht serialisierbar.", done: false },
-	{ title: "Set: schnelle Mitgliedschaft, im Store als Array speichern.", done: false },
-	{ title: "Reducer: alles serialisierbar lassen.", done: false }
+	{
+		title: "Tip: Use Map when keys are not strings (e.g. complex IDs). For string keys, an object is fine.",
+		done: false,
+		tags: ["tip", "map"]
+	},
+	{
+		title: "Tip: Use WeakMap as a side cache — store history without persisting.",
+		done: false,
+		tags: ["tip", "weakmap", "history"]
+	},
+	{
+		title: "Tip: Use Set for fast membership; persist as an array in the store.",
+		done: false,
+		tags: ["tip", "set"]
+	},
+	{
+		title: "Tip: Keep state serializable (only plain objects/arrays, no classes/Map/Set).",
+		done: false,
+		tags: ["tip", "serializable"]
+	},
+	{
+		title: "Tip: Try actions — toggle, add tags, flag; view history.",
+		done: false,
+		tags: ["demo"]
+	}
 ];
 
-// ----- plain in-memory "store" and ops (no RTK) -----
 const state: TodosState = structuredClone(initialState);
 
 function bootstrap(): void {
@@ -63,23 +81,17 @@ function selectById(id: string): Todo | undefined {
 	return state.entities[id];
 }
 
-// ----- in-memory auxiliary structures -----
-// Set: which todos are currently "flagged" for review (example use of Set)
 const flaggedTodos = new Set<string>();
-// Map: metadata per todo id (example why Map is nicer than plain object)
 const todoMeta = new Map<string, { lastTouched: number }>();
-// WeakMap: change history per actual todo object
 type ChangeEntry = { ts: number; action: string };
 const todoHistory = new WeakMap<Todo, ChangeEntry[]>();
 
-// boot
 bootstrap();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// helper to record history
 function recordHistory(todo: Todo | undefined, action: string) {
 	if (!todo) return;
 	const arr = todoHistory.get(todo) ?? [];
@@ -88,7 +100,6 @@ function recordHistory(todo: Todo | undefined, action: string) {
 	todoMeta.set(todo.id, { lastTouched: Date.now() });
 }
 
-// REST endpoints
 app.get("/todos", (_req, res) => {
 	const list = selectAll();
 	res.json(list);
@@ -140,17 +151,24 @@ app.post("/todos/:id/flag", (req, res) => {
 	res.json({ ok: true });
 });
 
+app.delete("/todos/:id/flag", (req, res) => {
+	const id = req.params.id;
+	const exists = selectById(id);
+	if (!exists) return res.status(404).json({ error: "not found" });
+	flaggedTodos.delete(id);
+	recordHistory(exists, "unflag");
+	res.status(204).send();
+});
+
 app.delete("/todos/:id", (req, res) => {
 	const id = req.params.id;
 	const exists = selectById(id);
 	if (!exists) return res.status(404).json({ error: "not found" });
-	// record before deletion, as WeakMap uses the object reference
 	recordHistory(exists, "deleteTodo");
 	deleteTodo(id);
 	res.status(204).send();
 });
 
-// expose meta and history in a serializable way
 app.get("/todos/:id/history", (req, res) => {
 	const todo = selectById(req.params.id);
 	if (!todo) return res.status(404).json({ error: "not found" });
