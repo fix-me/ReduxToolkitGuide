@@ -41,7 +41,7 @@ export function TodoRow({ t }: { t: Todo }) {
 
 	return (
 		<ListItem
-			alignItems="flex-start"
+			alignItems="center"
 			sx={(theme) => ({
 				position: "relative",
 				"&::before": {
@@ -68,7 +68,7 @@ export function TodoRow({ t }: { t: Todo }) {
 				}
 			})}
 		>
-			<ListItemIcon sx={{ alignSelf: "flex-start", mt: 0.5 }}>
+			<ListItemIcon sx={{ alignSelf: "center" }}>
 				<Checkbox edge="start" checked={t.done} onChange={() => toggleTodo(t.id)} />
 			</ListItemIcon>
 			<ListItemText
@@ -101,7 +101,7 @@ export function TodoRow({ t }: { t: Todo }) {
 			<Stack
 				direction={{ xs: "column", sm: "row" }}
 				spacing={{ xs: 0.25, sm: 0.5 }}
-				sx={{ alignSelf: "flex-start", ml: { xs: 0.5, sm: 0 } }}
+				sx={{ alignSelf: "center", ml: { xs: 0.5, sm: 0 } }}
 			>
 				<Tooltip title="View history">
 					<IconButton
