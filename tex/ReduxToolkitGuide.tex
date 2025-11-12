@@ -1,0 +1,384 @@
+% Beginner-friendly paper: Redux Toolkit (createSlice, createApi) and JS Maps/Sets
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{amsmath,amssymb}
+
+\hypersetup{
+	colorlinks=true,
+	linkcolor=black,
+	urlcolor=blue,
+	citecolor=black
+}
+
+\lstdefinelanguage{JavaScript}{
+  morekeywords={const,let,var,function,class,extends,return,if,else,for,while,import,export,from,new,try,catch,finally,throw,switch,case,break,continue,default,await,async,yield,true,false,null,undefined},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]'
+}
+
+\lstdefinestyle{code}{
+	language=JavaScript,
+	captionpos=b,
+	abovecaptionskip=12pt,
+	belowcaptionskip=6pt,
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue!70!black},
+	commentstyle=\color{gray!70!black},
+	stringstyle=\color{green!40!black},
+	showstringspaces=false,
+	columns=fullflexible,
+	keepspaces=true,
+	tabsize=2,
+	frame=single,
+	framerule=0.4pt,
+	rulecolor=\color{black},
+	breaklines=true
+}
+
+\title{Redux Toolkit and JavaScript Collections: A Beginner-Friendly Guide}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\vspace{1em}
+
+\section{Redux Toolkit: \texttt{createSlice}}
+\subsection{What it is}
+\textbf{\texttt{createSlice}} helps you define a piece of Redux state with:
+\begin{itemize}
+	\item a slice \textbf{name}
+	\item the \textbf{initial state}
+	\item \textbf{reducers} (how state changes)
+	\item auto-generated \textbf{action creators}
+	\item optional \textbf{selectors}
+\end{itemize}
+It uses Immer, so you can write state changes with simple assignments; Redux still keeps state immutable behind the scenes.
+
+\subsection{Why use it}
+\begin{itemize}
+	\item Less boilerplate than hand-written Redux.
+	\item Clear, single place for a feature’s state and logic.
+	\item Safer, concise update code thanks to Immer.
+\end{itemize}
+
+\subsection{How it looks in this project}
+\begin{lstlisting}[style=code,caption={UI slice with reducers and selectors}]
+import { createSlice } from "@reduxjs/toolkit"
+
+type UiState = {
+  filter: "all" | "open" | "done"
+  selectedTodoId: string | null
+}
+
+const initialState: UiState = { filter: "all", selectedTodoId: null }
+
+export const uiSlice = createSlice({
+  name: "todosUi",
+  initialState,
+  reducers: {
+    selectTodo: (state, action) => {
+      state.selectedTodoId = action.payload
+    },
+    setFilter: (state, action) => {
+      state.filter = action.payload
+    }
+  },
+  selectors: {
+    selectFilter: state => state.filter,
+    selectSelectedTodoId: state => state.selectedTodoId
+  }
+})
+
+export const { selectTodo, setFilter } = uiSlice.actions
+export const { selectFilter, selectSelectedTodoId } = uiSlice.selectors
+export const uiReducer = uiSlice.reducer
+\end{lstlisting}
+\noindent\textit{Explanation: This slice declares UI state (\texttt{filter}, \texttt{selectedTodoId}), reducers using Immer-style assignments, and colocated selectors. It also exports typed action creators and the reducer for store integration.}
+
+\subsection{Where it plugs into the store}
+\begin{lstlisting}[style=code,caption={Store integration with RTK Query and slice reducer}]
+import { configureStore } from "@reduxjs/toolkit"
+import { todosApi } from "./services/todosApi"
+import { uiReducer } from "./features/todos/uiSlice"
+
+export const store = configureStore({
+  reducer: {
+    [todosApi.reducerPath]: todosApi.reducer,
+    todosUi: uiReducer
+  },
+  middleware: getDefault => getDefault().concat(todosApi.middleware)
+})
+\end{lstlisting}
+\noindent\textit{Explanation: The store mounts RTK Query’s cache at \texttt{todosApi.reducerPath} and the UI slice at \texttt{todosUi}. The RTK Query middleware enables caching, invalidation, polling, and request deduplication.}
+
+\paragraph{Quick tips}
+\begin{itemize}
+	\item Keep each slice focused on one feature.
+	\item Reducers should be fast, side-effect free.
+	\item Put async/data fetching in RTK Query (next section).
+\end{itemize}
+
+\section{RTK Query: \texttt{createApi}}
+\subsection{What it is}
+\textbf{\texttt{createApi}} is Redux Toolkit’s built-in data fetching and caching. You describe endpoints; it generates React hooks and handles caching and refetching for you.\footnote{\texttt{@reduxjs/toolkit/query/react} provides the React hooks.}
+
+\subsection{Why use it}
+\begin{itemize}
+	\item Less code: hooks are generated for you.
+	\item Smart cache: avoids unnecessary network calls.
+	\item Easy updates: tag invalidation refreshes the right data.
+\end{itemize}
+
+\subsection{How it looks in this project}
+\begin{lstlisting}[style=code,caption={Todos API with tags and invalidation}]
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
+
+export const todosApi = createApi({
+  reducerPath: "todosApi",
+  baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:4000" }),
+  tagTypes: ["History", "Todos"],
+  endpoints: builder => ({
+    getTodos: builder.query({
+      query: () => "/todos",
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(t => ({ type: "Todos", id: t.id })),
+              { type: "Todos", id: "LIST" }
+            ]
+          : [{ type: "Todos", id: "LIST" }]
+    }),
+    addTodo: builder.mutation({
+      query: (title) => ({ url: "/todos", method: "POST", body: { title } }),
+      invalidatesTags: [{ type: "Todos", id: "LIST" }]
+    }),
+    // ... other mutations and queries
+  })
+})
+
+export const { useGetTodosQuery, useAddTodoMutation } = todosApi
+\end{lstlisting}
+\noindent\textit{Explanation: \texttt{getTodos} provides tags per item and a list tag; \texttt{addTodo} invalidates the list tag so \texttt{getTodos} re-fetches. Hooks \texttt{useGetTodosQuery} and \texttt{useAddTodoMutation} are generated for components.}
+
+\subsection{Caching in simple words}
+\begin{itemize}
+	\item \textbf{providesTags}: queries say “I filled these tags.”
+	\item \textbf{invalidatesTags}: mutations say “These tags are stale.”
+	\item When tags are invalidated, matching queries re-fetch automatically.
+\end{itemize}
+
+\paragraph{Quick tips}
+\begin{itemize}
+	\item Use queries for reads, mutations for writes.
+	\item Drive UI from hook state: \texttt{data}, \texttt{isLoading}, \texttt{error}.
+	\item Invalidate tags on writes so the UI stays fresh.
+\end{itemize}
+
+\section{JavaScript \texttt{Map}, \texttt{WeakMap}, and \texttt{Set}}
+\subsection{\texttt{Map}: key-value store}
+Think “dictionary”: any value can be a key (including objects). Keeps items in the order you added them. \textbf{Equality rules}: primitive keys (e.g., \texttt{string}, \texttt{number}, \texttt{boolean}, \texttt{bigint}, \texttt{symbol}) are compared by value (SameValueZero), while object keys are compared by reference. Using strings as keys is safe and deterministic; using objects as keys requires using the exact same object reference.
+
+\paragraph{Common operations}
+\begin{itemize}
+	\item \textbf{CRUD}: \texttt{set(k, v)}, \texttt{get(k)}, \texttt{has(k)}, \texttt{delete(k)}, \texttt{clear()}.
+	\item \textbf{Iteration}: \texttt{map.keys()}, \texttt{map.values()}, \texttt{map.entries()}, \texttt{for...of}.
+	\item \textbf{Size}: \texttt{map.size} (O(1)).
+\end{itemize}
+
+\begin{lstlisting}[style=code,caption={Map basics and iteration}]
+const m = new Map()
+const user = { id: "42" }
+m.set(user, ["a", "b"])
+m.set("threshold", 3)
+
+for (const [k, v] of m) {
+  // preserves insertion order
+}
+\end{lstlisting}
+\noindent\textit{Explanation: \texttt{Map} accepts heterogeneous keys (object and string here), keeps insertion order, and iterates as \texttt{[key, value]} pairs. String keys compare by value; object keys compare by reference. Prefer \texttt{Map} when you need non-string keys or want to avoid key coercion of plain objects.}
+
+\paragraph{Examples}
+\begin{itemize}
+	\item \textbf{Cache by composite input}: key by an options object reference to memoize an expensive computation.
+	\item \textbf{Stable ID lookup with order}: map task IDs to metadata while preserving creation order.
+	\item \textbf{Cross-graph associations}: map DOM nodes or external handles to app data without mutating the sources.
+\end{itemize}
+
+\subsection{\texttt{WeakMap}: private data for objects}
+Like \texttt{Map}, but keys must be objects, and they are held \emph{weakly}. If the object is no longer used elsewhere, the entry disappears automatically (helps prevent memory leaks).
+
+\paragraph{Notes}
+\begin{itemize}
+	\item Keys must be objects; primitives are invalid.
+	\item Non-enumerable by design: no \texttt{size}, no iteration; prevents observation of GC.
+	\item Ideal for private per-instance metadata without memory leaks.
+\end{itemize}
+
+\begin{lstlisting}[style=code,caption={WeakMap for private metadata}]
+const meta = new WeakMap()
+
+class Widget {
+  constructor(config) {
+    meta.set(this, { clicks: 0, config })
+  }
+  click() {
+    meta.get(this).clicks++
+  }
+}
+\end{lstlisting}
+\noindent\textit{Explanation: \texttt{WeakMap} attaches per-instance metadata without preventing garbage collection. It’s not iterable and has no \texttt{size}, which avoids observing GC behavior.}
+
+\paragraph{Examples}
+\begin{itemize}
+	\item \textbf{Per-instance private state}: store internal counters/config for class instances without exposing fields.
+	\item \textbf{DOM element metadata}: attach observers or measured layout data keyed by elements; entries vanish when elements are removed.
+	\item \textbf{Memoization keyed by objects}: cache derived results for specific object identities without leaks.
+\end{itemize}
+
+\subsection{\texttt{Set}: list of unique values}
+Stores unique values (no duplicates), in insertion order. Perfect for tags, selected IDs, etc.
+
+\paragraph{Common operations}
+\begin{itemize}
+	\item \textbf{CRUD}: \texttt{add(v)}, \texttt{has(v)}, \texttt{delete(v)}, \texttt{clear()}.
+	\item \textbf{Iteration}: \texttt{set.values()}, \texttt{set.entries()}, \texttt{for...of}; preserves insertion order.
+	\item \textbf{Size}: \texttt{set.size} (O(1)).
+\end{itemize}
+
+\begin{lstlisting}[style=code,caption={Set for de-duplication and membership}]
+const tags = new Set(["urgent", "work", "urgent"])
+// => {"urgent", "work"}
+
+tags.add("home")
+tags.has("work") // true
+for (const t of tags) {
+  // iterate unique tags
+}
+\end{lstlisting}
+\noindent\textit{Explanation: \texttt{Set} deduplicates values automatically and supports fast membership tests with \texttt{has}. It preserves insertion order when iterating.}
+
+\paragraph{Examples}
+\begin{itemize}
+	\item \textbf{Tags/labels}: maintain a unique set of labels from user input.
+	\item \textbf{Selections}: store selected item IDs for quick membership tests and toggling.
+	\item \textbf{Deduplication}: remove duplicates from arrays while preserving order (\texttt{[...new Set(arr)]}).
+\end{itemize}
+
+\subsection{Which one to use when}
+\begin{itemize}
+	\item \textbf{Map}: dictionary where keys can be anything (including objects).
+	\item \textbf{WeakMap}: attach private data to objects without leaking memory.
+	\item \textbf{Set}: list of unique items.
+\end{itemize}
+
+\section{Putting it together in a component}
+\begin{lstlisting}[style=code,caption={Query + mutation with generated hooks}]
+import { useGetTodosQuery, useAddTodoMutation } from "./services/todosApi"
+import { selectFilter, setFilter } from "./features/todos/uiSlice"
+import { useSelector, useDispatch } from "react-redux"
+
+export function TodoApp() {
+  const dispatch = useDispatch()
+  const filter = useSelector(state => selectFilter(state.todosUi))
+  const { data: todos = [], isLoading } = useGetTodosQuery()
+  const [addTodo, { isLoading: isAdding }] = useAddTodoMutation()
+
+  return (
+    // render todos; dispatch(setFilter("open"))
+    // call addTodo("title")
+  )
+}
+\end{lstlisting}
+\noindent\textit{Explanation: \texttt{useGetTodosQuery} exposes \texttt{data} and loading flags; \texttt{useAddTodoMutation} returns a trigger and mutation state. UI state is read via \texttt{useSelector} and modified via \texttt{dispatch}.}
+
+\section{React \texttt{useSelector}: selecting state safely and efficiently}
+\subsection{What it is}
+\textbf{\texttt{useSelector}} reads data from the Redux store in a React component. The component re-renders when the selected value changes by \emph{strict} equality (===) or a provided equality function.
+
+\subsection{Professional guidance}
+\begin{itemize}
+	\item \textbf{Select the smallest shape} the component needs (primitives or stable objects) to minimize re-renders.
+	\item \textbf{Use memoized selectors} (e.g., \texttt{reselect}) for derived data to avoid recomputation and stabilize references.
+	\item \textbf{Avoid inline object/array construction} inside the selector; it creates new references every render.
+	\item \textbf{Prefer slice selectors} colocated with the slice to centralize state knowledge.
+\end{itemize}
+
+\subsection{Type-safe patterns}
+\paragraph{Option A: pass slice state into generated selectors}
+\begin{lstlisting}[style=code,caption={Using slice selectors with root state}]
+import { useSelector } from "react-redux"
+import type { RootState } from "./store"
+import { selectFilter } from "./features/todos/uiSlice"
+
+export function FilterChip() {
+  const filter = useSelector((state: RootState) => selectFilter(state.todosUi))
+  return <span>{filter}</span>
+}
+\end{lstlisting}
+\noindent\textit{Explanation: This pattern scopes the selector to the \texttt{todosUi} slice and retains RootState type safety. Returning a primitive minimizes unnecessary re-renders.}
+
+\paragraph{Option B: typed selector hook (project standard)}
+\begin{lstlisting}[style=code,caption={Define a typed selector hook once}]
+import { useSelector, type TypedUseSelectorHook } from "react-redux"
+import type { RootState } from "./store"
+
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+\end{lstlisting}
+\noindent\textit{Explanation: A typed selector hook removes repeated RootState annotations at call sites and ensures selectors remain type-safe across the app.}
+
+\begin{lstlisting}[style=code,caption={Consume with typed selector hook}]
+import { useAppSelector } from "./useAppSelector"
+import { selectSelectedTodoId } from "./features/todos/uiSlice"
+
+export function SelectedInfo() {
+  const selectedId = useAppSelector(state => selectSelectedTodoId(state.todosUi))
+  return <div>{selectedId ?? "None selected"}</div>
+}
+\end{lstlisting}
+\noindent\textit{Explanation: Consuming the typed hook improves ergonomics. Returning a primitive (\texttt{string|null}) keeps equality checks cheap and stable.}
+
+\subsection{Performance notes}
+\begin{itemize}
+	\item The default comparison is strict equality. If you must return shallow objects, you can use: \texttt{useSelector(selectFn, shallowEqual)}.
+	\item For non-trivial derived data, use \texttt{createSelector} (from \texttt{reselect}) to memoize:
+\end{itemize}
+
+\begin{lstlisting}[style=code,caption={Memoized derived selector with reselect}]
+import { createSelector } from "reselect"
+import type { RootState } from "./store"
+
+const selectTodos = (state: RootState) => state.todosApi // RTKQ cache slice
+// Example: derive counts from UI-filtered todos (sketch; adapt to your shape)
+export const selectOpenCount = createSelector(
+  [
+    (state: RootState) => state.todosUi.filter,
+    (state: RootState) => state
+  ],
+  (filter, state) => {
+    // compute from state and filter; return a primitive for stable equality
+    return 0
+  }
+)
+\end{lstlisting}
+\noindent\textit{Explanation: \texttt{createSelector} memoizes derived results based on inputs. Returning primitives (numbers/strings/booleans) helps \texttt{useSelector} avoid re-renders. Adapt the computation to your actual state shape.}
+
+\section{Cheat sheet}
+\begin{itemize}
+	\item \textbf{createSlice}: define state + reducers + actions (+ selectors).
+	\item \textbf{createApi}: define queries/mutations; use generated hooks.
+	\item \textbf{Tags}: queries \texttt{providesTags}, mutations \texttt{invalidatesTags}.
+	\item \textbf{useSelector}: select minimal stable values; memoize derived data.
+	\item \textbf{Map}: key-value by any key; \textbf{WeakMap}: object keys, GC-safe; \textbf{Set}: unique values.
+\end{itemize}
+
+\end{document}
+
+
