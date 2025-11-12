@@ -2,6 +2,9 @@
 
 Vite + React + TypeScript client with Redux Toolkit and RTK Query, and an Express server with a plain in-memory data store. The server keeps the persisted state serializable and uses side-car in-memory structures (`Set`, `Map`, `WeakMap`) for derived metadata and change history.
 
+### Takeaway paper (PDF)
+- [ReduxToolkitGuide.pdf](tex/ReduxToolkitGuide.pdf)
+
 ### Requirements
 - Node >= 18
 - Windows cmd examples below (adjust if using a different shell)
@@ -26,6 +29,9 @@ root/
         TodoApp.tsx
         TodoHistoryPanel.tsx
         types.ts
+  tex/
+    ReduxToolkitGuide.tex
+    ReduxToolkitGuide.pdf
   README.md
 ```
 
